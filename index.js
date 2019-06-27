@@ -1,17 +1,13 @@
 const Extractor = require('angular-gettext-tools').Extractor;
 const fs = require('fs');
 const PO = require('pofile');
-const loaderUtils = require('loader-utils');
 const path = require('path');
 const _ = require('lodash');
 
 function matches (oldRef, newRef) {
-  return _(oldRef).split(':').first() === _(newRef).split(':').first();
+    return _(oldRef).split(':').first() === _(newRef).split(':').first();
 }
 
-/**
- * Merge new references with old references; ignore old references from the same file.
- */
 function mergeReferences (oldRefs, newRefs) {
     const _newRefs = _(newRefs);
 
@@ -27,72 +23,69 @@ function mergeReferences (oldRefs, newRefs) {
         .value();
 }
 
-
-/**
- * Parse and merge options from:
- *   - config-level object (`angularGettextExtractLoader`)
- *   - query string
- */
-function getOptions(loaderContext) {
-    const config = loaderContext.rootContext['angularGettextExtractLoader'];
-    const query = loaderUtils.getOptions(loaderContext);
-    // Need polyfill for IE, you could replace it back to lodash _({}, ..)
-    const options = Object.assign({}, config, query);
-
-    // Parse `extensions` option. Allows for custom file schemes.
-    if (typeof options.extensions === 'string') {
-        options.extensions = JSON.parse(options.extensions);
-    }
-
-    if (!options.pofile) {
-        options.pofile = 'template.pot';
-    }
-
-    return options;
+function castingAsPoItem(item) {
+    return _.reduce(item, (result, value, key) => {
+        if (value instanceof PO.Item) {
+            return result;
+        }
+        result[key] = new PO.Item();
+        _.assign(result[key], value);
+        return result;
+    }, item);
 }
 
-
-module.exports = function (source) {
-    this.cacheable();
-
-    const options = getOptions(this);
-    var po;
-
-    try {
-        const s = fs.readFileSync(options.pofile, 'utf8');
-        po = PO.parse(s);
-    } catch (e) {
-        if (e.code === 'ENOENT') {
-            po = new PO();
-        } else {
-            throw new Error('Problem loading pofile: ' + e);
-        }
+class AngularGettextPlugin {
+    constructor(options) {
+        this.options = _.cloneDeep(options);
+        this.options.postProcess = this.options.postProcess || function () {};
+        this.strings = {};
     }
+    apply(compiler) {
+        const self = this;
+        const NO_CONTEXT = '$$noContext';
 
-    const extractor = new Extractor(options);
+        function collectData(request, data) {
+            _.forEach(data, (value, key) => {
+                value = castingAsPoItem(value);
+                let existing = self.strings[key];
+                if (!existing) {
+                    self.strings[key] = value;
+                    return;
+                }
 
-    const filename = path.relative(this.rootContext, this.resourcePath);
-
-    extractor.parse(filename, source);
-
-    po.items.forEach(function (item) {
-        const context = item.msgctxt || '$$noContext';
-
-        if (!extractor.strings[item.msgid]) {
-            extractor.strings[item.msgid] = {};
+                const item = value[NO_CONTEXT];
+                existing = existing[NO_CONTEXT];
+                if (item && existing) {
+                    existing.comments = _.uniq(existing.comments.concat(item.comments)).sort();
+                    existing.references = mergeReferences(item.references, existing.references);
+                    return;
+                }
+                self.strings[key] = _.assign(self.strings[key], value)
+            });
         }
 
-        const existing = extractor.strings[item.msgid][context];
+        compiler.hooks.emit.tapAsync('AngularGettextPlugin', function (compilation, cb) {
+            const s = fs.readFileSync(path.resolve(__dirname, '../../../app/gettext/po/doorayWebApp.gettext.pot'), 'utf8');
+            const oldPo = PO.parse(s);
 
-        if (existing) {
-            existing.comments = _.uniq(existing.comments.concat(item.comments)).sort();
-            existing.references = mergeReferences(item.references, existing.references);
-        } else {
-            extractor.strings[item.msgid][context] = item;
-        }
-    });
+            oldPo.items = _.reject(oldPo.items, item => {
+                if (self.strings[item.msgid] && self.strings[item.msgid][item.msgctxt || NO_CONTEXT]) {
+                    return true;
+                }
+            });
+            fs.writeFileSync('po/templateCompare.pot',  oldPo.toString());
 
-  fs.writeFileSync(options.pofile, extractor.toString());
+            fs.writeFile('po/template.pot',  Extractor.prototype.toString.call(self), cb);
+        });
 
-  return source;
-};
+        compiler.hooks.compilation.tap('AngularGettextPlugin', function (compilation) {
+            compilation.hooks.normalModuleLoader.tap('AngularGettextPlugin', function (loaderContext) {
+                loaderContext.emitData = collectData
+            });
+        });
+    }
+}
+
+AngularGettextPlugin.loader = require.resolve('./loader');
+
+exports.default = AngularGettextPlugin;
