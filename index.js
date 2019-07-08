@@ -49,6 +49,7 @@ class AngularGettextPlugin {
     apply(compiler) {
         const self = this;
         const NO_CONTEXT = '$$noContext';
+        const compilerOptions = this.options;
         let firstRun = true;
 
         function collectData(request, data) {
@@ -76,7 +77,6 @@ class AngularGettextPlugin {
                 return cb();
             }
             firstRun = false;
-            const compilerOptions = this.options.compiler;
             mkdirSyncRecursive(compilerOptions.baseDir);
             const filePathList = _.flatten(_.map(compilerOptions.langList, locale => {
                 return _.map(compilerOptions.resultFiles, metadata => {
@@ -112,14 +112,14 @@ class AngularGettextPlugin {
                 }
                 this.oldStrings = this.strings;
 
-                if (this.options.pofile) {
-                    Promise.all(_.map(this.options.langList, lang => new Promise(resolve => {
-                        fs.writeFile(this.options.pofile, Extractor.prototype.toString.call(this, lang), resolve);
+                if (compilerOptions.pofile) {
+                    Promise.all(_.map(compilerOptions.langList, lang => new Promise(resolve => {
+                        fs.writeFile(compilerOptions.pofile, Extractor.prototype.toString.call(this, lang), resolve);
                     }))).then(cb);
                 }
 
-                if (this.options.saveCallback) {
-                    this.options.saveCallback(Extractor.prototype.toPo.call(this), makeSaveCallbackCb(compilation, cb));
+                if (compilerOptions.saveCallback) {
+                    compilerOptions.saveCallback(Extractor.prototype.toPo.call(this), makeSaveCallbackCb(compilation, cb));
                 }
             });
         });
