@@ -8,11 +8,13 @@ exports.default = function (source) {
   var loaderOptions = loaderUtils.getOptions(this) || {};
   const options = _.cloneDeep(loaderOptions);
   const possibleExtensions = _.keys(options.extensions);
-  const extractor = new Extractor(options);
-
-  extractor.parse(path.relative(this.rootContext || '', this.resourcePath), source);
-
-  this.emitData && this.emitData(this.resourcePath, extractor.strings);
+  const fullPath = path.join(this.rootContext || '', this.resourcePath);
+  const isExcluded = options.exclude && new RegExp(options.exclude).test(fullPath);
+  if (!isExcluded && _.includes(possibleExtensions, extractExtension(this.resourcePath))) {
+    const extractor = new Extractor(options);
+    extractor.parse(fullPath, source);
+    this.emitData && this.emitData(this.resourcePath, extractor.strings);
+  }
   callback(null, source);
 }
 
