@@ -10,7 +10,11 @@ exports.default = function (source) {
   const possibleExtensions = _.keys(options.extensions);
   const fullPath = path.join(this.rootContext || '', this.resourcePath);
   const isExcluded = options.exclude && new RegExp(options.exclude).test(fullPath);
-  if (!isExcluded && _.includes(possibleExtensions, extractExtension(this.resourcePath))) {
+  if (
+      !isExcluded &&
+      this.request.lastIndexOf('.vue?vue') === -1 &&
+      _.includes(possibleExtensions, extractExtension(this.resourcePath))
+  ) {
     const extractor = new Extractor(options);
     extractor.parse(fullPath, source);
     this.emitData && !_.isEmpty(extractor.strings) && this.emitData(this.resourcePath, extractor.strings);

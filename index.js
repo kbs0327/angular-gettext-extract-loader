@@ -43,12 +43,12 @@ class AngularGettextPlugin {
     this.options = _.cloneDeep(options);
     this.options.postProcess = this.options.postProcess || function () {};
     this.options.langList = this.options.langList || [];
+    this.additioanlStrings = {};
     this.strings = {};
-    this.oldStrings = {};
     this.datas = [];
+    this.poDatas = null;
   }
   apply(compiler) {
-    const NO_CONTEXT = '$$noContext';
     const compilerOptions = this.options;
     let firstRun = true;
 
@@ -87,36 +87,10 @@ class AngularGettextPlugin {
       });
 
       compilation.hooks.finishModules.tapAsync('AngularGettextPlugin', (modules, cb) => {
-        if (this.datas.length > 0) {
-          _.forEach(this.datas, data => {
-            _.forEach(data, (value, key) => {
-              value = castingAsPoItem(value);
-              let existing = this.strings[key];
-              if (!existing) {
-                this.strings[key] = value;
-                return;
-              }
-
-              const item = value[NO_CONTEXT];
-              existing = existing[NO_CONTEXT];
-              if (item && existing) {
-                existing.comments = _.uniq(existing.comments.concat(item.comments)).sort();
-                existing.references = mergeReferences(item.references, existing.references);
-                return;
-              }
-              this.strings[key] = _.assign(this.strings[key], value)
-            });
-          });
-          this.datas.length = 0;
-        }
-        this.hasExtraKeys = _.some(this.strings, (value, key) => {
-          const oldValue = this.oldStrings[key];
-          return !oldValue || !_.every(_.keys(value), context => oldValue[context]);
-        })
-        if (!this.hasExtraKeys) {
+        this.processLoaderDatas();
+        if (_.isEmpty(this.additioanlStrings)) {
           return cb();
         }
-        this.oldStrings = this.strings;
 
         if (compilerOptions.pofile) {
           Promise.all(_.map(compilerOptions.langList, lang => new Promise(resolve => {
@@ -124,22 +98,72 @@ class AngularGettextPlugin {
           }))).then(cb);
         }
 
+        if (this.poDatas) {
+          this.appendAdditionalStrings(compilerOptions.langList);
+        }
+        this.additioanlStrings = {};
+
         if (compilerOptions.saveCallback) {
-          compilerOptions.saveCallback(Extractor.prototype.toPo.call(this), makeSaveCallbackCb(compilation, cb));
+          if (!this.poDatas) {
+            return compilerOptions.saveCallback(Extractor.prototype.toPo.call(this), null, makeSaveCallbackCb(compilation, cb).bind(this));
+          }
+          compilerOptions.saveCallback(null, this.poDatas, makeSaveCallbackCb(compilation, cb).bind(this));
         }
       });
     });
+  }
 
+  appendAdditionalStrings(langList) {
+    _.forEach(langList, lang => {
+      const po = this.poDatas[lang];
+      for (var msgstr in this.additioanlStrings) {
+        var msg = this.additioanlStrings[msgstr];
+        var contexts = Object.keys(msg);
+        for (var i = 0; i < contexts.length; i++) {
+          const value = new PO.Item();
+          _.assign(value, msg[contexts[i]]);
+          value.msgstr = [''];
+          po.items.push(value);
+        }
+      }
+    });
+  }
+
+  processLoaderDatas() {
+    const NO_CONTEXT = '$$noContext';
+    if (this.datas.length > 0) {
+      _.forEach(this.datas, data => {
+        _.forEach(data, (value, key) => {
+          value = castingAsPoItem(value);
+          let existing = this.strings[key];
+          if (!existing) {
+            this.additioanlStrings[key] = value;
+            this.strings[key] = value;
+            return;
+          }
+
+          const item = value[NO_CONTEXT];
+          existing = existing[NO_CONTEXT];
+          if (item && existing) {
+            existing.comments = _.uniq(existing.comments.concat(item.comments)).sort();
+            existing.references = mergeReferences(item.references, existing.references);
+            return;
+          }
+          this.strings[key] = _.assign(this.strings[key], value)
+          this.additioanlStrings[key] = _.assign(this.additioanlStrings[key], value);
+        });
+      });
+      this.datas.length = 0;
+    }
   }
 }
 
 function makeSaveCallbackCb(compilation, cb) {
-  return (
-      langList, poDatas, {baseDir, resultFiles} = {}
-  ) => {
+  return function (langList, poDatas, {baseDir, resultFiles} = {}) {
     if (!poDatas) {
       return cb();
     }
+    this.poDatas = poDatas;
     const promiseList = _.map(langList, locale => {
       const localeList = [{
         locale,
