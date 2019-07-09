@@ -13,7 +13,7 @@ exports.default = function (source) {
   if (!isExcluded && _.includes(possibleExtensions, extractExtension(this.resourcePath))) {
     const extractor = new Extractor(options);
     extractor.parse(fullPath, source);
-    this.emitData && this.emitData(this.resourcePath, extractor.strings);
+    this.emitData && !_.isEmpty(extractor.strings) && this.emitData(this.resourcePath, extractor.strings);
   }
   callback(null, source);
 }
