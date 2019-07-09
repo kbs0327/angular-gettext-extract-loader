@@ -48,10 +48,11 @@ class AngularGettextPlugin {
     this.datas = [];
   }
   apply(compiler) {
-    const self = this;
     const NO_CONTEXT = '$$noContext';
     const compilerOptions = this.options;
     let firstRun = true;
+
+    compilerOptions.preload && compilerOptions.preload();
 
     const createDummyFiles = (compiler, cb) => {
       if (!firstRun) {
@@ -142,7 +143,7 @@ function makeSaveCallbackCb(compilation, cb) {
     const promiseList = _.map(langList, locale => {
       const localeList = [{
         locale,
-        strings: Compiler.parsePoItems(poDatas[locale].items)
+        strings: Compiler.parsePoItems(poDatas[locale].items, false)
       }];
       return Promise.all(_.map(resultFiles, metadata => {
         let data = new Compiler(metadata.compilerOptions).format(localeList);
@@ -150,19 +151,18 @@ function makeSaveCallbackCb(compilation, cb) {
         const filename = _.isFunction(metadata.filename) ? metadata.filename(locale) : metadata.filename;
         const filepath = path.resolve(baseDir, filename);
         const module = compilation.findModule(filepath);
-        return new Promise((resolve) => {
-          fs.writeFile(filepath, data, 'utf8', err => {
-            if (module) {
-              if (_.endsWith(module.request, '.json')) {
-                module.buildInfo.jsonData = JSON.parse(data);
-              }
-              module._source = new OriginalSource(data, filepath);
-              module._cachedSources.clear();
-              module.buildTimestamp = Date.now();
-            }
-            resolve();
-          });
-        });
+        if (module) {
+          if (_.endsWith(module.request, '.json')) {
+            module.buildInfo.jsonData = JSON.parse(data);
+          }
+          module._source = new OriginalSource(data, filepath);
+          module._cachedSources.clear();
+          module.buildTimestamp = Date.now();
+        }
+
+        if (metadata.saveFile) {
+          fs.writeFile(filepath, data, 'utf8', () => {});
+        }
       }));
     });
     Promise.all(promiseList).finally(cb);
