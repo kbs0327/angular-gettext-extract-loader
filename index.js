@@ -92,10 +92,8 @@ class AngularGettextPlugin {
           return cb();
         }
 
-        if (compilerOptions.pofile) {
-          Promise.all(_.map(compilerOptions.langList, lang => new Promise(resolve => {
-            fs.writeFile(compilerOptions.pofile, Extractor.prototype.toString.call(this, lang), resolve);
-          }))).then(cb);
+        if (compilerOptions.potfile) {
+          fs.writeFile(compilerOptions.potfile, Extractor.prototype.toPo.call(this, '').toString(), () => {});
         }
 
         if (this.poDatas) {
