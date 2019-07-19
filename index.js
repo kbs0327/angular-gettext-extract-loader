@@ -17,7 +17,7 @@ function mergeReferences (oldRefs, newRefs) {
 
   return _(oldRefs)
       .reject(function (oldRef) {
-        return _newRefs.any(function (newRef) {
+        return _newRefs.some(function (newRef) {
           return matches(oldRef, newRef);
         });
       })
