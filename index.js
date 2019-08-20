@@ -179,6 +179,7 @@ function makeSaveCallbackCb(compilation, cb) {
           }
           module._source = new OriginalSource(data, filepath);
           module._cachedSources.clear();
+          module._initBuildHash(compilation);
           module.buildTimestamp = Date.now();
         }
 
