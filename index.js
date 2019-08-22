@@ -73,7 +73,7 @@ class AngularGettextPlugin {
           }
           resolve();
         });
-      })).finally(cb);
+      })).then(cb, cb);
     };
 
     compiler.hooks.run.tapAsync('AngularGettextPlugin', createDummyFiles);
@@ -190,7 +190,7 @@ function makeSaveCallbackCb(compilation, cb) {
         }
       }));
     });
-    Promise.all(promiseList).finally(cb);
+    Promise.all(promiseList).then(cb, cb);
   }
 }
 
