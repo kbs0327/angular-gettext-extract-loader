@@ -20,7 +20,7 @@
   "author": "Rowan Crawford <wombleton@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "angular-gettext-tools": "github:kbs0327/angular-gettext-tools#3.0.1",
+    "angular-gettext-tools": "github:kbs0327/angular-gettext-tools#3.0.3",
     "loader-utils": "1.1.0",
     "lodash": "^3.10.1",
     "pofile": "^1.0.0"
