@@ -118,7 +118,7 @@ class AngularGettextPlugin {
       const po = this.poDatas[lang];
       for (var msgstr in this.additioanlStrings) {
         var msg = this.additioanlStrings[msgstr];
-        var contexts = Object.keys(msg);
+        var contexts = Object.keys(msg || {});
         for (var i = 0; i < contexts.length; i++) {
           const value = new PO.Item();
           _.assign(value, msg[contexts[i]]);
